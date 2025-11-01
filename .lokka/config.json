@@ -1,0 +1,9 @@
+{
+  "tenantId": "<TENANT_ID>",
+  "clientId": "<CLIENT_ID>",
+  "authority": "https://login.microsoftonline.com/<TENANT_ID>",
+  "certPath": "./.lokka/certs/entra_cert.pem",
+  "certPassword": "",
+  "scopes": ["https://graph.microsoft.com/.default"]
+}
+

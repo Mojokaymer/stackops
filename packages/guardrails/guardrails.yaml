@@ -1,0 +1,20 @@
+protectedPrincipals:
+  - "breakglass@contoso.com"
+  - "globaladmin@contoso.com"
+
+limits:
+  maxUsersPerBatch: 25
+
+writes:
+  enabled: true
+  requireApproval: true
+
+toolsAllowed:
+  - "graph.users.create"
+  - "graph.users.disable"
+  - "graph.users.resetPassword"
+  - "graph.groups.addMember"
+  - "graph.groups.removeMember"
+  - "graph.licenses.assign"
+  - "graph.licenses.remove"
+
