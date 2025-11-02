@@ -1,97 +1,170 @@
 "use client";
 
+import * as React from "react";
 import { useState } from "react";
-import Link from "next/link";
-import AppHeader from "@/components/app-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Bot, CheckCircle2, Clock, AlertCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import Link from "next/link";
+
+const PageHeader = ({
+  title,
+  breadcrumbs,
+}: {
+  title: string;
+  breadcrumbs?: { label: string; href?: string }[];
+}) => {
+  return (
+    <div className="mb-8">
+      {breadcrumbs && breadcrumbs.length > 0 && (
+        <Breadcrumb className="mb-2">
+          <BreadcrumbList>
+            {breadcrumbs.map((crumb, index) => (
+              <React.Fragment key={index}>
+                <BreadcrumbItem>
+                  {index === breadcrumbs.length - 1 ? (
+                    <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                  ) : (
+                    <BreadcrumbLink href={crumb.href || "#"}>{crumb.label}</BreadcrumbLink>
+                  )}
+                </BreadcrumbItem>
+                {index < breadcrumbs.length - 1 && <BreadcrumbSeparator />}
+              </React.Fragment>
+            ))}
+          </BreadcrumbList>
+        </Breadcrumb>
+      )}
+      <div className="flex items-center justify-between">
+        <h2 className="text-3xl font-bold tracking-tight">{title}</h2>
+      </div>
+    </div>
+  );
+};
 
 export default function AgentPage() {
-  const [text, setText] = useState("");
-  const [resp, setResp] = useState<any>(null);
+  const [command, setCommand] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [intentId, setIntentId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const submit = async () => {
+  const handleSubmit = async () => {
+    if (!command.trim()) return;
+
     setIsLoading(true);
+    setError(null);
+
     try {
-      const r = await fetch("/api/intent/parse", {
+      const response = await fetch("/api/intent/parse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenantId: "contoso.onmicrosoft.com", text }),
+        body: JSON.stringify({ 
+          tenantId: "contoso.onmicrosoft.com", 
+          text: command 
+        }),
       });
-      const data = await r.json();
-      setResp(data);
-    } catch (error) {
-      console.error("Error:", error);
+
+      const data = await response.json();
+
+      if (data.intent) {
+        setIntentId(data.intent.id);
+        setShowSuccess(true);
+        setCommand("");
+      } else if (data.error) {
+        setError(data.error);
+      }
+    } catch (err) {
+      setError("Failed to create intent. Please try again.");
+      console.error("Error:", err);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <main className="p-6">
-      <AppHeader />
-      
-      <div className="max-w-4xl mx-auto space-y-6">
+    <>
+      <PageHeader
+        title="Agent Console"
+        breadcrumbs={[{ label: "Home", href: "/dashboard" }, { label: "Agent Console" }]}
+      />
+
+      <div className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              🤖 Agent Console
-              <Badge variant="secondary">Natural Language</Badge>
+              <Bot className="h-5 w-5" />
+              Natural Language Command
             </CardTitle>
+            <CardDescription>
+              Describe what you want to do in plain English. The AI agent will create an execution plan for your approval.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={`Example: Create user Alice Dupont, alice@contoso.com, Sales, E3 license, add to "Sales-EU"`}
-              className="min-h-[150px] font-mono text-sm"
-            />
-            <div className="flex justify-end">
-              <Button onClick={submit} disabled={isLoading || !text.trim()}>
-                {isLoading ? "Processing..." : "Create Intent"}
-              </Button>
+            <div className="space-y-2">
+              <Label htmlFor="command">Command</Label>
+              <Textarea
+                id="command"
+                placeholder="Example: Create a new user john.doe@contoso.com and assign them an E5 license"
+                value={command}
+                onChange={(e) => setCommand(e.target.value)}
+                rows={4}
+                className="resize-none"
+              />
             </div>
+            <Button 
+              onClick={handleSubmit} 
+              disabled={isLoading || !command.trim()} 
+              className="w-full sm:w-auto"
+            >
+              <Bot className="mr-2 h-4 w-4" />
+              {isLoading ? "Processing..." : "Generate Plan"}
+            </Button>
           </CardContent>
         </Card>
 
-        {resp?.intent && (
-          <Card className="border-primary/20 bg-primary/5">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">Intent Created</CardTitle>
-                <Badge>Success</Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="text-sm space-y-1">
-                <div className="text-muted-foreground">Intent ID:</div>
-                <code className="text-xs bg-muted px-2 py-1 rounded">{resp.intent.id}</code>
-              </div>
-              <div className="text-sm space-y-1">
-                <div className="text-muted-foreground">Type:</div>
-                <Badge variant="outline">{resp.intent.type}</Badge>
-              </div>
-              <Button asChild variant="outline" className="w-full">
-                <Link href={`/plans/${resp.intent.id}`}>View Plan Details →</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {resp?.error && (
-          <Card className="border-destructive/20 bg-destructive/5">
-            <CardHeader>
-              <CardTitle className="text-lg text-destructive">Error</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{JSON.stringify(resp.error)}</p>
-            </CardContent>
-          </Card>
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
       </div>
-    </main>
+
+      <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
+        <DialogContent>
+          <DialogHeader>
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-500/10">
+              <CheckCircle2 className="h-6 w-6 text-green-500" />
+            </div>
+            <DialogTitle className="text-center">Intent Created Successfully</DialogTitle>
+            <DialogDescription className="text-center">
+              Your command has been processed and an execution plan has been created.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowSuccess(false);
+                setIntentId(null);
+              }}
+            >
+              Create Another
+            </Button>
+            {intentId && (
+              <Button asChild>
+                <Link href={`/plans/${intentId}`}>View Plan</Link>
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
