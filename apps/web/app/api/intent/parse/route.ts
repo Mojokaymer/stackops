@@ -1,47 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const text: string = body.text || "";
   const tenantId: string = body.tenantId || null;
 
-  const email = (text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [])[0] || "user@example.com";
+  if (!tenantId || !text) {
+    return NextResponse.json({ error: "Missing tenantId or text" }, { status: 400 });
+  }
 
-  const plan = {
-    steps: [
-      {
-        tool: "graph.users.create",
-        input: {
-          displayName: "Alice Dupont",
-          userPrincipalName: email,
-          mailNickname: email.split("@")[0],
-          jobTitle: "Sales Representative",
-          department: "Sales",
-          usageLocation: "FR",
-          passwordProfile: {
-            password: "Temp!P@ss-1234",
-            forceChangePasswordNextSignIn: true
-          }
-        }
-      },
-      {
-        tool: "graph.groups.addMember",
-        input: { group: "Sales-EU", userPrincipalName: email }
-      },
-      {
-        tool: "graph.licenses.assign",
-        input: { userPrincipalName: email, skus: ["M365_E3"] }
-      }
-    ]
-  };
+  try {
+    const workerUrl = process.env.WORKER_URL || "http://localhost:3100";
+    const response = await fetch(`${workerUrl}/agent/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tenantId, text }),
+    });
 
-  const sb = supabaseServer();
-  const { data, error } = await sb.from("intents").insert({
-    tenant_id: tenantId, type: "createUser", input_json: { text }, plan_json: plan, status: "planned"
-  }).select().single();
+    const data = await response.json();
 
-  if (error) return NextResponse.json({ error }, { status: 500 });
-  return NextResponse.json({ intent: data });
+    if (data.status === "clarify") {
+      return NextResponse.json({ clarify: data.question });
+    }
+
+    // data contains { intentId, status, plan }
+    return NextResponse.json({ 
+      intent: { 
+        id: data.intentId, 
+        plan_json: data.plan,
+        status: data.status 
+      } 
+    });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || "Failed to process request" }, { status: 500 });
+  }
 }
 

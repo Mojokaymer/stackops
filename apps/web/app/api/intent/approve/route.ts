@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
   const form = await req.formData();
@@ -9,21 +8,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing intentId" }, { status: 400 });
   }
 
-  const sb = supabaseServer();
-  
-  // Update intent status to approved
-  const { error } = await sb
-    .from("intents")
-    .update({ status: "approved" })
-    .eq("id", intentId);
+  try {
+    const workerUrl = process.env.WORKER_URL || "http://localhost:3100";
+    const response = await fetch(`${workerUrl}/agent/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ intentId }),
+    });
 
-  if (error) {
-    return NextResponse.json({ error }, { status: 500 });
+    const result = await response.json();
+
+    if (result.status === "applied") {
+      return NextResponse.redirect(new URL(`/plans/${intentId}`, req.url));
+    } else {
+      return NextResponse.json({ 
+        error: result.error || "Execution failed" 
+      }, { status: 500 });
+    }
+  } catch (error: any) {
+    return NextResponse.json({ 
+      error: error.message || "Failed to approve intent" 
+    }, { status: 500 });
   }
-
-  // TODO: Trigger worker to execute the plan
-  // This will be handled by the Python worker listening to database changes
-
-  return NextResponse.redirect(new URL(`/plans/${intentId}`, req.url));
 }
 

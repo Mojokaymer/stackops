@@ -1,0 +1,13 @@
+toolsAllowed:
+  - graph.users.create
+  - graph.groups.addMember
+  - graph.licenses.assign
+  - graph.users.disable
+
+limits:
+  maxUsersPerBatch: 25
+
+protectedPrincipals:
+  - breakglass@contoso.com
+  - globaladmin@contoso.com
+
